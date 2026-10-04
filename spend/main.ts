@@ -104,10 +104,68 @@ function renderReadout(year: number) {
   }
 }
 
+function requiredIds(year: number): string[] {
+  if (year < 2000) return ["newspaper", "magazine", "books", "broadcast"];
+  if (year <= 2001) return ["newspaper", "magazine", "books", "nhk", "other-incl"];
+  return ["newspaper", "magazine", "books", "nhk", "cable", "other"];
+}
+
+function shareRows(year: number): { item: Item; point: Row; share: number }[] | null {
+  const ids = requiredIds(year);
+  const rows = ids.map((id) => {
+    const item = data.items.find((entry) => entry.id === id);
+    const point = item ? pointAt(id, year) : undefined;
+    return item && point ? { item, point } : null;
+  });
+  if (rows.some((row) => row === null)) return null;
+  const present = rows.filter((row): row is { item: Item; point: Row } => row !== null);
+  const total = present.reduce((sum, row) => sum + row.point.value, 0);
+  if (!(total > 0)) return null;
+  return present.map((row) => ({ ...row, share: (row.point.value / total) * 100 }));
+}
+
+function formatShare(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)}%`;
+}
+
+function renderShareReadout(year: number) {
+  const box = document.querySelector("#share-readout");
+  if (!box) return;
+  box.replaceChildren();
+  const yearEl = document.createElement("span");
+  yearEl.className = "year";
+  yearEl.textContent = `${year}年`;
+  box.append(yearEl);
+  const rows = shareRows(year);
+  if (!rows) return;
+  const who = document.createElement("span");
+  who.textContent = universeLabel[rows[0].point.universe] ?? "";
+  const sum = document.createElement("span");
+  sum.innerHTML = "<b>合計 100%</b>";
+  box.append(who, sum);
+  for (const row of rows) {
+    const bit = document.createElement("span");
+    bit.textContent = `${shorts[row.item.id] ?? row.item.name} ${formatShare(row.share)}`;
+    box.append(bit);
+  }
+}
+
+const shareCharts: Series[] = charts.map((series) => ({
+  ...series,
+  points: series.points.flatMap((point) => {
+    const rows = shareRows(point.year);
+    const row = rows?.find((entry) => entry.item.id === series.id);
+    if (!row) return [];
+    return [{ ...point, value: row.share }];
+  }),
+}));
+
 const spendYears = spanYears(data.yearStart, data.yearEnd);
 const seriesIds = charts.map((series) => series.id);
 const views = mountViews(document.querySelector("#views")!, [
   { id: "amount", label: "金額", hint: "1963–2025" },
+  { id: "share", label: "割合", hint: "1963–2025" },
   { id: "item", label: "品目", hint: "1963–2025" },
 ]);
 showView(views.id);
@@ -137,6 +195,28 @@ const stack = mountChart(document.querySelector("#stack")!, {
   },
 });
 
+const share = mountChart(document.querySelector("#share")!, {
+  series: shareCharts,
+  yearStart: data.yearStart,
+  yearEnd: data.yearEnd,
+  breaks: data.breaks,
+  mode: "stack",
+  unit: "point",
+  year: initialYear,
+  hidden,
+  annotations: [
+    { year: 2000, label: "世帯の範囲" },
+    { year: 2018, label: "調査方法" },
+  ],
+  onYear(year) {
+    renderShareReadout(year);
+    if (views.id === "share") writeYear(year, spendYears);
+  },
+  onHidden(ids) {
+    if (views.id === "share") writeOff(ids);
+  },
+});
+
 const lines = mountChart(document.querySelector("#lines")!, {
   series: charts,
   yearStart: data.yearStart,
@@ -160,8 +240,10 @@ views.onChange(() => {
   const next = off ?? [];
   if (off === null) writeOff([]);
   stack.setYear(year);
+  share.setYear(year);
   lines.setYear(year);
   stack.setHidden(next);
+  share.setHidden(next);
   lines.setHidden(next);
 });
 
@@ -242,4 +324,5 @@ if (table) {
 }
 
 void stack;
+void share;
 void lines;
