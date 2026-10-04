@@ -1,0 +1,59 @@
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.chart-head .chart-title { margin-bottom: 8px; }
+.chart-head .chart-note { margin-bottom: 0; }
+.scale {
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 5.5%, transparent);
+}
+.scale-thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  z-index: 0;
+  width: calc((100% - 4px) / 2);
+  border-radius: 5px;
+  background: var(--paper);
+  box-shadow: 0 1px 2px rgba(22, 20, 15, 0.12);
+  transform: translateX(0);
+  transition: transform 200ms var(--ease-out);
+}
+.scale[data-mode="amount"] .scale-thumb { transform: translateX(100%); }
+.scale button {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: color 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+.scale button[aria-checked="true"] { color: var(--ink); }
+.scale button:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .scale button:hover { color: var(--ink); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scale-thumb,
+  .scale button { transition: none; }
+  .scale button:active { transform: none; }
+}

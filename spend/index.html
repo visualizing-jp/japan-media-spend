@@ -36,18 +36,19 @@
         <p class="lede rise rise-3" id="lede"></p>
         <div class="view-panel" data-view="amount">
         <section class="chart-block rise rise-4">
-          <h2 class="chart-title">年間に払った金額</h2>
-          <p class="chart-note">積み上げは、その年に公表されている品目だけを足している。2000年で帯を切る。</p>
+          <div class="chart-head">
+            <div>
+              <h2 class="chart-title">年間に払った金額</h2>
+              <p class="chart-note" id="amount-note">積み上げは、その年に公表されている品目だけを足している。2000年で帯を切る。</p>
+            </div>
+            <div class="scale" id="scale" role="radiogroup" aria-label="表示" data-mode="share">
+              <span class="scale-thumb" aria-hidden="true"></span>
+              <button type="button" role="radio" data-mode="share" aria-checked="true">構成比</button>
+              <button type="button" role="radio" data-mode="amount" aria-checked="false">量</button>
+            </div>
+          </div>
           <div class="readout" id="readout" aria-live="polite"></div>
-          <div id="stack"></div>
-          <p class="chart-note">グラフに触れると年が変わる。選んでから、左右の矢印でも移動できる。</p>
-        </section>
-        </div>
-        <div class="view-panel" data-view="share">
-        <section class="chart-block">
-          <h2 class="chart-title">その年の合計に対する割合</h2>
-          <p class="chart-note">分母は、金額ビューの全系列の合計。凡例を消しても、残った系列だけで100%にはしない。必要な系列が一つでも欠ける年は空欄。2000年で帯を切る。</p>
-          <div class="readout" id="share-readout" aria-live="polite"></div>
+          <div id="stack" hidden></div>
           <div id="share"></div>
           <p class="chart-note">グラフに触れると年が変わる。選んでから、左右の矢印でも移動できる。</p>
         </section>

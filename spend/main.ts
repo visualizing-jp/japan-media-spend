@@ -1,9 +1,10 @@
 import "../shared/theme.css";
+import "./scale.css";
 import series from "../data/kakei/series.json";
 import { formatYen, mountChart, type Series } from "../shared/chart";
 import { hosts, siteHref } from "../shared/hosts";
 import { mountMarks } from "../shared/mark";
-import { mountViews, parseOff, readYear, showView, spanYears, writeOff, writeYear } from "../shared/query";
+import { mountViews, parseOff, readQuery, readYear, showView, spanYears, writeOff, writeQuery, writeYear } from "../shared/query";
 
 type Row = {
   year: number;
@@ -130,7 +131,7 @@ function formatShare(value: number): string {
 }
 
 function renderShareReadout(year: number) {
-  const box = document.querySelector("#share-readout");
+  const box = document.querySelector("#readout");
   if (!box) return;
   box.replaceChildren();
   const yearEl = document.createElement("span");
@@ -165,16 +166,53 @@ const spendYears = spanYears(data.yearStart, data.yearEnd);
 const seriesIds = charts.map((series) => series.id);
 const views = mountViews(document.querySelector("#views")!, [
   { id: "amount", label: "金額", hint: "1963–2025" },
-  { id: "share", label: "割合", hint: "1963–2025" },
   { id: "item", label: "品目", hint: "1963–2025" },
 ]);
+const modeFallback = "share";
+let mode = readQuery("mode", modeFallback, (value) => value === "share" || value === "amount");
+writeQuery("mode", mode, modeFallback);
+
+const amountNote = "積み上げは、その年に公表されている品目だけを足している。2000年で帯を切る。";
+const shareNote = "その年の全系列の合計を 100% にする。凡例を消しても、残った系列だけでは 100% にしない。必要な系列が欠ける年は空欄。2000年で帯を切る。";
+
+function paintReadout(year: number) {
+  if (mode === "share") renderShareReadout(year);
+  else renderReadout(year);
+}
+
+function applyMode(next: string) {
+  mode = next === "amount" ? "amount" : "share";
+  writeQuery("mode", mode, modeFallback);
+  const scale = document.querySelector<HTMLElement>("#scale");
+  if (scale) scale.dataset.mode = mode;
+  scale?.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => {
+    button.setAttribute("aria-checked", button.dataset.mode === mode ? "true" : "false");
+  });
+  const note = document.querySelector("#amount-note");
+  if (note) note.textContent = mode === "share" ? shareNote : amountNote;
+  const stackHost = document.querySelector<HTMLElement>("#stack");
+  const shareHost = document.querySelector<HTMLElement>("#share");
+  if (stackHost) stackHost.hidden = mode !== "amount";
+  if (shareHost) shareHost.hidden = mode !== "share";
+}
+
+applyMode(mode);
+const peers: { stack?: ReturnType<typeof mountChart>; share?: ReturnType<typeof mountChart> } = {};
+document.querySelectorAll<HTMLButtonElement>("#scale [data-mode]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (button.dataset.mode === mode || !button.dataset.mode) return;
+    applyMode(button.dataset.mode);
+    const year = (mode === "share" ? peers.share : peers.stack)?.getYear();
+    if (year !== undefined) paintReadout(year);
+  });
+});
 showView(views.id);
 const initialOff = parseOff(seriesIds);
 if (initialOff === null) writeOff([]);
 const hidden = initialOff ?? [];
 const initialYear = readYear(spendYears);
 
-const stack = mountChart(document.querySelector("#stack")!, {
+peers.stack = mountChart(document.querySelector("#stack")!, {
   series: charts,
   yearStart: data.yearStart,
   yearEnd: data.yearEnd,
@@ -187,15 +225,18 @@ const stack = mountChart(document.querySelector("#stack")!, {
     { year: 2018, label: "調査方法" },
   ],
   onYear(year) {
-    renderReadout(year);
     if (views.id === "amount") writeYear(year, spendYears);
+    if (mode === "amount") paintReadout(year);
+    if (peers.share && peers.share.getYear() !== year) peers.share.setYear(year);
   },
   onHidden(ids) {
-    if (views.id === "amount") writeOff(ids);
+    if (views.id !== "amount") return;
+    writeOff(ids);
+    peers.share?.setHidden(ids);
   },
 });
 
-const share = mountChart(document.querySelector("#share")!, {
+peers.share = mountChart(document.querySelector("#share")!, {
   series: shareCharts,
   yearStart: data.yearStart,
   yearEnd: data.yearEnd,
@@ -209,11 +250,14 @@ const share = mountChart(document.querySelector("#share")!, {
     { year: 2018, label: "調査方法" },
   ],
   onYear(year) {
-    renderShareReadout(year);
-    if (views.id === "share") writeYear(year, spendYears);
+    if (views.id === "amount") writeYear(year, spendYears);
+    if (mode === "share") paintReadout(year);
+    if (peers.stack && peers.stack.getYear() !== year) peers.stack.setYear(year);
   },
   onHidden(ids) {
-    if (views.id === "share") writeOff(ids);
+    if (views.id !== "amount") return;
+    writeOff(ids);
+    peers.stack?.setHidden(ids);
   },
 });
 
@@ -239,11 +283,11 @@ views.onChange(() => {
   const off = parseOff(seriesIds);
   const next = off ?? [];
   if (off === null) writeOff([]);
-  stack.setYear(year);
-  share.setYear(year);
+  peers.stack?.setYear(year);
+  peers.share?.setYear(year);
   lines.setYear(year);
-  stack.setHidden(next);
-  share.setHidden(next);
+  peers.stack?.setHidden(next);
+  peers.share?.setHidden(next);
   lines.setHidden(next);
 });
 
@@ -323,6 +367,5 @@ if (table) {
   table.append(head, body);
 }
 
-void stack;
-void share;
+void peers;
 void lines;
